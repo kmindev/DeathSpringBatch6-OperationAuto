@@ -1,4 +1,4 @@
-package rip.kill9.terminator.config;
+package rip.kill9.terminator.config.ex1;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.job.Job;
