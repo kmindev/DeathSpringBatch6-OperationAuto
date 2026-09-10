@@ -15,6 +15,7 @@ Spring Batch 스터디
 | ex8 | Job/Step 리스너 예제 (인터페이스 구현 방식 + `@BeforeJob`/`@AfterJob`/`@BeforeStep`/`@AfterStep` 애너테이션 방식) | `./gradlew bootRun --args='--spring.batch.job.name=securityAuditJob'` |
 | ex9 | FlatFileItemReader 예제 (DelimitedLineTokenizer/FixedLengthTokenizer, 현재는 고정폭 방식 활성화) | `./gradlew bootRun --args="--spring.batch.job.name=systemFailureJob inputFile=/path/to/system_failures.txt,java.lang.String"` |
 | ex10 | RegexLineTokenizer 예제 (정규식 캡처 그룹으로 로그 라인 파싱) | `./gradlew bootRun --args="--spring.batch.job.name=logAnalysisJob inputFile=/path/to/system_logs.txt,java.lang.String"` |
+| ex11 | PatternMatchingCompositeLineMapper 예제 (라인 패턴별 다른 Tokenizer/FieldSetMapper 적용, BeanWrapperFieldSetMapper + RecordFieldSetMapper 혼용) | `./gradlew bootRun --args="--spring.batch.job.name=cursedCodeJob inputFile=/path/to/cursed_code.txt,java.lang.String"` |
 
 ## 참고자료
 
