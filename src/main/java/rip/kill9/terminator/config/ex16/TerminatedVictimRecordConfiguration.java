@@ -2,6 +2,7 @@ package rip.kill9.terminator.config.ex16;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,8 +13,12 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.batch.infrastructure.item.database.JdbcCursorItemReader;
+import org.springframework.batch.infrastructure.item.database.JdbcPagingItemReader;
+import org.springframework.batch.infrastructure.item.database.Order;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcCursorItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.database.builder.JdbcPagingItemReaderBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,7 +41,7 @@ public class TerminatedVictimRecordConfiguration {
 
     @Bean
     public Step terminatedVictimRecordStep(
-        JdbcCursorItemReader<Victim> terminatedVictimReader
+        ItemReader<Victim> terminatedVictimReader
     ) {
         return new StepBuilder(jobRepository)
             .<Victim, Victim>chunk(5)
@@ -46,13 +51,31 @@ public class TerminatedVictimRecordConfiguration {
             .build();
     }
 
+//    @Bean
+//    public JdbcCursorItemReader<Victim> terminatedVictimReader() {
+//        return new JdbcCursorItemReaderBuilder<Victim>()
+//            .name("terminatedVictimReader")
+//            .dataSource(dataSource)
+//            .sql("SELECT * FROM victims WHERE status = ? AND terminated_at <= ?")
+//            .queryArguments(List.of("TERMINATED", LocalDateTime.now()))
+//            .beanRowMapper(Victim.class)
+//            .build();
+//    }
+
     @Bean
-    public JdbcCursorItemReader<Victim> terminatedVictimReader() {
-        return new JdbcCursorItemReaderBuilder<Victim>()
+    public JdbcPagingItemReader<Victim> terminatedVictimReader() throws Exception {
+        return new JdbcPagingItemReaderBuilder<Victim>()
             .name("terminatedVictimReader")
             .dataSource(dataSource)
-            .sql("SELECT * FROM victims WHERE status = ? AND terminated_at <= ?")
-            .queryArguments(List.of("TERMINATED", LocalDateTime.now()))
+            .pageSize(5)
+            .selectClause("SELECT id, name, process_id, terminated_at, status")
+            .fromClause("FROM victims")
+            .whereClause("WHERE status = :status AND terminated_at <= :terminatedAt")
+            .sortKeys(Map.of("id", Order.ASCENDING))
+            .parameterValues(Map.of(
+                "status", "TERMINATED",
+                "terminatedAt", LocalDateTime.now()
+            ))
             .beanRowMapper(Victim.class)
             .build();
     }
