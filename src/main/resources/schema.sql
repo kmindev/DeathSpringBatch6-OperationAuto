@@ -13,3 +13,22 @@ CREATE TABLE IF NOT EXISTS orders (
     status VARCHAR(20) NOT NULL,
     shipping_id VARCHAR(50)
 );
+
+CREATE TABLE posts (
+                       id BIGINT NOT NULL,
+                       title VARCHAR(255),
+                       content TEXT,
+                       writer VARCHAR(255),
+                       PRIMARY KEY (id)
+);
+
+CREATE TABLE reports (
+                         id BIGINT NOT NULL,
+                         post_id BIGINT NOT NULL,
+                         report_type VARCHAR(50),
+                         reporter_level INTEGER,
+                         evidence_data TEXT,
+                         reported_at TIMESTAMP,
+                         PRIMARY KEY (id),
+                         FOREIGN KEY (post_id) REFERENCES posts(id)
+);

@@ -13,6 +13,8 @@ spring:
       enabled: true
 
   jpa:
+    hibernate:
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:

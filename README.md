@@ -19,17 +19,18 @@ Spring Batch 스터디
 | ex12 | MultiResourceItemReader 예제 (여러 CSV 파일을 파일명 역순 comparator로 순회하며 읽기) | `./gradlew bootRun --args="--spring.batch.job.name=multiResourceSystemFailureJob inputFilePath=/path/to/dir,java.lang.String"`<br>(디렉터리에 `critical-failures.csv`, `normal-failures.csv` 필요) |
 | ex16 | JdbcCursorItemReader / JdbcPagingItemReader 예제 (H2 `victims` 테이블에서 조건부 조회, 현재는 페이징 방식 활성화, `schema.sql`/`data.sql`로 샘플 데이터 자동 적재) | `./gradlew bootRun --args='--spring.batch.job.name=terminatedVictimRecordJob'` |
 | ex17 | JdbcPagingItemReader + ItemProcessor + JdbcBatchItemWriter 예제 (H2 `orders` 테이블에서 상태 불일치("탈취된") 주문을 찾아 상태 복구) | `./gradlew bootRun --args='--spring.batch.job.name=resecureJob'` |
+| ex18 | JpaCursorItemReader 예제 (H2 `posts`/`reports` 테이블, JPQL로 기간 내 신고된 게시물 조회 후 신고 점수 계산) | `./gradlew bootRun --args="--spring.batch.job.name=toxicPostExterminationJob startDateTime=2026-09-10T00:00:00,java.time.LocalDateTime endDateTime=2026-09-11T00:00:00,java.time.LocalDateTime"` |
 
-## 실행 SQL 로그 확인
+## SQL 로그 확인
 
-JDBC 기반 예제(ex4, ex16, ex17 등)에서 실제로 나가는 SQL과 바인딩 파라미터를 보고 싶다면 `application.yml`에 다음 로깅 설정이 되어 있습니다.
-
-```yaml
-logging:
-  level:
-    org.springframework.jdbc.core: DEBUG
-    org.springframework.jdbc.core.StatementCreatorUtils: TRACE
-```
+- JDBC 기반 예제(ex4, ex16, ex17 등): `application.yml`의 다음 설정으로 실제 SQL과 바인딩 파라미터를 볼 수 있습니다.
+  ```yaml
+  logging:
+    level:
+      org.springframework.jdbc.core: DEBUG
+      org.springframework.jdbc.core.StatementCreatorUtils: TRACE
+  ```
+- JPA 기반 예제(ex18): `spring.jpa.show-sql`과 `hibernate.format_sql`/`highlight_sql` 설정으로 Hibernate가 생성하는 SQL을 보기 좋게 출력합니다. `spring.jpa.hibernate.ddl-auto`는 `none`으로 고정되어 있는데, 기본값(`create-drop`)을 쓰면 기동 시 Hibernate가 `schema.sql`/`data.sql`로 채워둔 `posts`/`reports` 테이블을 지우고 다시 만들어 데이터가 사라지기 때문입니다.
 
 ## 참고자료
 
