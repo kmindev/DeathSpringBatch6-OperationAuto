@@ -20,6 +20,17 @@ Spring Batch 스터디
 | ex16 | JdbcCursorItemReader / JdbcPagingItemReader 예제 (H2 `victims` 테이블에서 조건부 조회, 현재는 페이징 방식 활성화, `schema.sql`/`data.sql`로 샘플 데이터 자동 적재) | `./gradlew bootRun --args='--spring.batch.job.name=terminatedVictimRecordJob'` |
 | ex17 | JdbcPagingItemReader + ItemProcessor + JdbcBatchItemWriter 예제 (H2 `orders` 테이블에서 상태 불일치("탈취된") 주문을 찾아 상태 복구) | `./gradlew bootRun --args='--spring.batch.job.name=resecureJob'` |
 
+## 실행 SQL 로그 확인
+
+JDBC 기반 예제(ex4, ex16, ex17 등)에서 실제로 나가는 SQL과 바인딩 파라미터를 보고 싶다면 `application.yml`에 다음 로깅 설정이 되어 있습니다.
+
+```yaml
+logging:
+  level:
+    org.springframework.jdbc.core: DEBUG
+    org.springframework.jdbc.core.StatementCreatorUtils: TRACE
+```
+
 ## 참고자료
 
 - https://github.com/KILL9-NO-MERCY/Death-Spring-Batch
