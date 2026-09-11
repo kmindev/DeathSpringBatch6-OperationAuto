@@ -15,6 +15,8 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.database.JpaCursorItemReader;
 import org.springframework.batch.infrastructure.item.database.builder.JpaCursorItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.database.orm.JpaNamedQueryProvider;
+import org.springframework.batch.infrastructure.item.database.orm.JpaQueryProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,6 +53,26 @@ public class ToxicPostExterminationConfiguration {
             .build();
     }
 
+//    @StepScope
+//    @Bean
+//    public JpaCursorItemReader<Post> reportedPostReader(
+//        @Value("#{jobParameters['startDateTime']}") LocalDateTime startDateTime,
+//        @Value("#{jobParameters['endDateTime']}") LocalDateTime endDateTime
+//    ) {
+//        return new JpaCursorItemReaderBuilder<Post>()
+//            .name("reportedPostReader")
+//            .entityManagerFactory(entityManagerFactory)
+//            .queryString("""
+//                  SELECT p FROM Post p JOIN FETCH p.reports r
+//                  WHERE r.reportedAt >= :startDateTime AND r.reportedAt < :endDateTime
+//                """)
+//            .parameterValues(Map.of(
+//                "startDateTime", startDateTime,
+//                "endDateTime", endDateTime
+//            ))
+//            .build();
+//    }
+
     @StepScope
     @Bean
     public JpaCursorItemReader<Post> reportedPostReader(
@@ -60,15 +82,19 @@ public class ToxicPostExterminationConfiguration {
         return new JpaCursorItemReaderBuilder<Post>()
             .name("reportedPostReader")
             .entityManagerFactory(entityManagerFactory)
-            .queryString("""
-                  SELECT p FROM Post p JOIN FETCH p.reports r
-                  WHERE r.reportedAt >= :startDateTime AND r.reportedAt < :endDateTime
-                """)
+            .queryProvider(createQueryProvider())
             .parameterValues(Map.of(
                 "startDateTime", startDateTime,
                 "endDateTime", endDateTime
             ))
             .build();
+    }
+
+    private JpaNamedQueryProvider<Post> createQueryProvider() {
+        JpaNamedQueryProvider<Post> queryProvider = new JpaNamedQueryProvider<>();
+        queryProvider.setEntityClass(Post.class);
+        queryProvider.setNamedQuery("Post.findByReportsReportedAtBetween");
+        return queryProvider;
     }
 
     @Bean
