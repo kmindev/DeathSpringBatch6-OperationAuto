@@ -1,6 +1,7 @@
 package rip.kill9.terminator.config.ex18;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
@@ -8,6 +9,7 @@ import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
+import org.hibernate.annotations.BatchSize;
 
 @Getter
 @NamedQuery(
@@ -24,6 +26,7 @@ public class Post {
     private String content;
     private String writer;
 
-    @OneToMany(mappedBy = "post")
+    @OneToMany(mappedBy = "post", fetch = FetchType.EAGER)
+    @BatchSize(size = 5)
     private List<Report> reports = new ArrayList<>();
 }

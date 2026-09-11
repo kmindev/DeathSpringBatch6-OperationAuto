@@ -14,7 +14,9 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.database.JpaCursorItemReader;
+import org.springframework.batch.infrastructure.item.database.JpaPagingItemReader;
 import org.springframework.batch.infrastructure.item.database.builder.JpaCursorItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.database.builder.JpaPagingItemReaderBuilder;
 import org.springframework.batch.infrastructure.item.database.orm.JpaNamedQueryProvider;
 import org.springframework.batch.infrastructure.item.database.orm.JpaQueryProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,7 +42,7 @@ public class ToxicPostExterminationConfiguration {
 
     @Bean
     public Step toxicPostExterminationStep(
-        JpaCursorItemReader<Post> reportedPostReader,
+        JpaPagingItemReader<Post> reportedPostReader,
         PostExterminationProcessor postExterminationProcessor,
         ItemWriter<ExterminatedPost> exterminatedPostItemWriter
     ) {
@@ -73,28 +75,52 @@ public class ToxicPostExterminationConfiguration {
 //            .build();
 //    }
 
+//    @StepScope
+//    @Bean
+//    public JpaCursorItemReader<Post> reportedPostReader(
+//        @Value("#{jobParameters['startDateTime']}") LocalDateTime startDateTime,
+//        @Value("#{jobParameters['endDateTime']}") LocalDateTime endDateTime
+//    ) {
+//        return new JpaCursorItemReaderBuilder<Post>()
+//            .name("reportedPostReader")
+//            .entityManagerFactory(entityManagerFactory)
+//            .queryProvider(createQueryProvider())
+//            .parameterValues(Map.of(
+//                "startDateTime", startDateTime,
+//                "endDateTime", endDateTime
+//            ))
+//            .build();
+//    }
+//
+//    private JpaNamedQueryProvider<Post> createQueryProvider() {
+//        JpaNamedQueryProvider<Post> queryProvider = new JpaNamedQueryProvider<>();
+//        queryProvider.setEntityClass(Post.class);
+//        queryProvider.setNamedQuery("Post.findByReportsReportedAtBetween");
+//        return queryProvider;
+//    }
+
     @StepScope
     @Bean
-    public JpaCursorItemReader<Post> reportedPostReader(
+    public JpaPagingItemReader<Post> reportedPostReader(
         @Value("#{jobParameters['startDateTime']}") LocalDateTime startDateTime,
         @Value("#{jobParameters['endDateTime']}") LocalDateTime endDateTime
     ) {
-        return new JpaCursorItemReaderBuilder<Post>()
+        return new JpaPagingItemReaderBuilder<Post>()
             .name("reportedPostReader")
             .entityManagerFactory(entityManagerFactory)
-            .queryProvider(createQueryProvider())
+            .queryString("""
+                SELECT DISTINCT p FROM Post p
+                JOIN p.reports r
+                WHERE r.reportedAt >= :startDateTime AND r.reportedAt < :endDateTime
+                ORDER BY p.id ASC
+                """)
             .parameterValues(Map.of(
                 "startDateTime", startDateTime,
                 "endDateTime", endDateTime
             ))
+            .pageSize(5)
+            .transacted(false) // transacted=true 인 경우 reader에서 entityManager.flush()하기 때문에 reader에서 데이터 변경이 발생할 수 있음.
             .build();
-    }
-
-    private JpaNamedQueryProvider<Post> createQueryProvider() {
-        JpaNamedQueryProvider<Post> queryProvider = new JpaNamedQueryProvider<>();
-        queryProvider.setEntityClass(Post.class);
-        queryProvider.setNamedQuery("Post.findByReportsReportedAtBetween");
-        return queryProvider;
     }
 
     @Bean
