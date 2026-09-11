@@ -1,4 +1,4 @@
-package rip.kill9.terminator.config;
+package rip.kill9.terminator.config.ex17;
 
 import java.time.LocalDateTime;
 import java.util.Map;

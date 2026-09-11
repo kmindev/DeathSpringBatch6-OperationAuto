@@ -18,7 +18,7 @@ Spring Batch 스터디
 | ex11 | PatternMatchingCompositeLineMapper 예제 (라인 패턴별 다른 Tokenizer/FieldSetMapper 적용, BeanWrapperFieldSetMapper + RecordFieldSetMapper 혼용) | `./gradlew bootRun --args="--spring.batch.job.name=cursedCodeJob inputFile=/path/to/cursed_code.txt,java.lang.String"` |
 | ex12 | MultiResourceItemReader 예제 (여러 CSV 파일을 파일명 역순 comparator로 순회하며 읽기) | `./gradlew bootRun --args="--spring.batch.job.name=multiResourceSystemFailureJob inputFilePath=/path/to/dir,java.lang.String"`<br>(디렉터리에 `critical-failures.csv`, `normal-failures.csv` 필요) |
 | ex16 | JdbcCursorItemReader / JdbcPagingItemReader 예제 (H2 `victims` 테이블에서 조건부 조회, 현재는 페이징 방식 활성화, `schema.sql`/`data.sql`로 샘플 데이터 자동 적재) | `./gradlew bootRun --args='--spring.batch.job.name=terminatedVictimRecordJob'` |
-| - | JdbcPagingItemReader + ItemProcessor + JdbcBatchItemWriter 예제 (H2 `orders` 테이블에서 상태 불일치("탈취된") 주문을 찾아 상태 복구) | `./gradlew bootRun --args='--spring.batch.job.name=resecureJob'` |
+| ex17 | JdbcPagingItemReader + ItemProcessor + JdbcBatchItemWriter 예제 (H2 `orders` 테이블에서 상태 불일치("탈취된") 주문을 찾아 상태 복구) | `./gradlew bootRun --args='--spring.batch.job.name=resecureJob'` |
 
 ## 참고자료
 
