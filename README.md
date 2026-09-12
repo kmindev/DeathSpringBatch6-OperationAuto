@@ -31,6 +31,7 @@ Spring Batch 스터디
       org.springframework.jdbc.core.StatementCreatorUtils: TRACE
   ```
 - JPA 기반 예제(ex18): `spring.jpa.show-sql`과 `hibernate.format_sql`/`highlight_sql` 설정으로 Hibernate가 생성하는 SQL을 보기 좋게 출력합니다. `spring.jpa.hibernate.ddl-auto`는 `none`으로 고정되어 있는데, 기본값(`create-drop`)을 쓰면 기동 시 Hibernate가 `schema.sql`/`data.sql`로 채워둔 `posts`/`reports` 테이블을 지우고 다시 만들어 데이터가 사라지기 때문입니다.
+  - `hibernate.jdbc.batch_size`(+ `order_inserts`/`order_updates`)를 설정해뒀기 때문에 `exterminated_posts` INSERT는 JDBC 배치로 묶여서 나갑니다. 다만 `show-sql`이 찍는 로그는 배치 여부와 무관하게 매 INSERT 문 텍스트를 그대로 보여주므로, 로그 줄 수만으로는 배치가 됐는지 알 수 없습니다 — 실제 배치 적용 여부는 기동 로그의 `HHH100501: Automatic JDBC statement batching enabled` 메시지로 확인할 수 있습니다.
 
 ## JpaPagingItemReader 사용 시 주의점 (ex18)
 
