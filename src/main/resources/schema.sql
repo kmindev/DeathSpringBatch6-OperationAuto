@@ -32,3 +32,12 @@ CREATE TABLE reports (
                          PRIMARY KEY (id),
                          FOREIGN KEY (post_id) REFERENCES posts(id)
 );
+
+CREATE TABLE exterminated_posts (
+    post_id BIGINT PRIMARY KEY,
+    writer VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    report_count INTEGER NOT NULL,
+    score DOUBLE PRECISION NOT NULL,
+    exterminated_at TIMESTAMP NOT NULL
+);

@@ -14,8 +14,10 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.database.JpaCursorItemReader;
+import org.springframework.batch.infrastructure.item.database.JpaItemWriter;
 import org.springframework.batch.infrastructure.item.database.JpaPagingItemReader;
 import org.springframework.batch.infrastructure.item.database.builder.JpaCursorItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.database.builder.JpaItemWriterBuilder;
 import org.springframework.batch.infrastructure.item.database.builder.JpaPagingItemReaderBuilder;
 import org.springframework.batch.infrastructure.item.database.orm.JpaNamedQueryProvider;
 import org.springframework.batch.infrastructure.item.database.orm.JpaQueryProvider;
@@ -123,17 +125,25 @@ public class ToxicPostExterminationConfiguration {
             .build();
     }
 
+//    @Bean
+//    public ItemWriter<ExterminatedPost> exterminatedPostItemWriter() {
+//        return items -> {
+//            items.forEach(blockedPost -> {
+//                log.info("Exterminated: [ID:{}] '{}' by {} | 신고:{}건 | 점수:{} | kill-9 at {}",
+//                    blockedPost.getPostId(), blockedPost.getTitle(), blockedPost.getWriter(),
+//                    blockedPost.getReportCount(), String.format("%.2f", blockedPost.getScore()),
+//                    blockedPost.getExterminatedAt().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+//                );
+//            });
+//        };
+//    }
+
     @Bean
-    public ItemWriter<ExterminatedPost> exterminatedPostItemWriter() {
-        return items -> {
-            items.forEach(blockedPost -> {
-                log.info("Exterminated: [ID:{}] '{}' by {} | 신고:{}건 | 점수:{} | kill-9 at {}",
-                    blockedPost.getPostId(), blockedPost.getTitle(), blockedPost.getWriter(),
-                    blockedPost.getReportCount(), String.format("%.2f", blockedPost.getScore()),
-                    blockedPost.getExterminatedAt().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-                );
-            });
-        };
+    public JpaItemWriter<ExterminatedPost> exterminatedPostItemWriter() {
+        return new JpaItemWriterBuilder<ExterminatedPost>()
+            .entityManagerFactory(entityManagerFactory)
+            .usePersist(true)
+            .build();
     }
 
 }
