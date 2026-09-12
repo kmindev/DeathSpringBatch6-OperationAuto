@@ -19,7 +19,7 @@ Spring Batch 스터디
 | ex12 | MultiResourceItemReader 예제 (여러 CSV 파일을 파일명 역순 comparator로 순회하며 읽기) | `./gradlew bootRun --args="--spring.batch.job.name=multiResourceSystemFailureJob inputFilePath=/path/to/dir,java.lang.String"`<br>(디렉터리에 `critical-failures.csv`, `normal-failures.csv` 필요) |
 | ex16 | JdbcCursorItemReader / JdbcPagingItemReader 예제 (H2 `victims` 테이블에서 조건부 조회, 현재는 페이징 방식 활성화, `schema.sql`/`data.sql`로 샘플 데이터 자동 적재) | `./gradlew bootRun --args='--spring.batch.job.name=terminatedVictimRecordJob'` |
 | ex17 | JdbcPagingItemReader + ItemProcessor + JdbcBatchItemWriter 예제 (H2 `orders` 테이블에서 상태 불일치("탈취된") 주문을 찾아 상태 복구) | `./gradlew bootRun --args='--spring.batch.job.name=resecureJob'` |
-| ex18 | JpaCursorItemReader → JpaNamedQueryProvider → JpaPagingItemReader 순으로 발전시킨 예제 (H2 `posts`/`reports` 테이블, 기간 내 신고된 게시물 조회 후 신고 점수 계산, 현재는 페이징 방식 활성화) | `./gradlew bootRun --args="--spring.batch.job.name=toxicPostExterminationJob startDateTime=2026-09-10T00:00:00,java.time.LocalDateTime endDateTime=2026-09-11T00:00:00,java.time.LocalDateTime"` |
+| ex18 | JpaCursorItemReader → JpaNamedQueryProvider → JpaPagingItemReader 순으로 발전시킨 예제 (H2 `posts`/`reports` 테이블, 기간 내 신고된 게시물 조회 후 신고 점수 계산해 `JpaItemWriter`로 `exterminated_posts` 테이블에 저장, 현재는 페이징 방식 활성화) | `./gradlew bootRun --args="--spring.batch.job.name=toxicPostExterminationJob startDateTime=2026-09-10T00:00:00,java.time.LocalDateTime endDateTime=2026-09-11T00:00:00,java.time.LocalDateTime"` |
 
 ## SQL 로그 확인
 
