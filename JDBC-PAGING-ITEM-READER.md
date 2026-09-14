@@ -18,7 +18,56 @@ AbstractPagingItemReader<T>                    ← "페이지 단위로 읽는�
 JdbcPagingItemReader<T>                        ← JDBC + PagingQueryProvider로 실제 SQL 실행
 ```
 
-## 2. `doRead()` — 페이지를 언제 새로 가져오는가
+## 2. 메서드별 호출 시점과 역할
+
+### 호출 순서 개요
+
+```
+[Step 시작]
+  afterPropertiesSet()   ← Spring 컨테이너가 빈 초기화 때 1회
+  open(ExecutionContext) ← Step 시작 시 1회 (ChunkOrientedStep.open())
+    └─ doOpen()
+    └─ (재시작이면) jumpToItem(itemIndex)
+
+[청크 반복]
+  read()                 ← 청크당 최대 chunkSize번, 아이템마다 1번
+    └─ doRead()
+         └─ (페이지 소진 시) doReadPage()
+              └─ PagingRowMapper.mapRow()  ← 행마다 1번씩
+  update(ExecutionContext) ← 청크 커밋 직전 1번
+
+[Step 종료]
+  close()
+    └─ doClose()
+```
+
+### 메서드별 상세
+
+| 메서드 | 속한 클래스 | 누가, 언제 호출하는가 | 역할 |
+|---|---|---|---|
+| **`afterPropertiesSet()`** | `JdbcPagingItemReader` | Spring 컨테이너가 빈을 만든 직후, `InitializingBean` 계약에 따라 **딱 1번**. Step 실행과 무관하게 애플리케이션 컨텍스트 구성 시점에 일어남 | `JdbcTemplate` 생성, `maxRows=pageSize` 설정, `PagingQueryProvider.init(dataSource)` 호출, `firstPageSql`/`remainingPagesSql` 문자열을 미리 한 번만 조립해서 필드에 캐싱 |
+| **`open(ExecutionContext)`** | `JdbcPagingItemReader` (오버라이드) | `ChunkOrientedStep.open()` → `compositeItemStream.open(executionContext)`가 Step **시작 시 1번** 호출 | `ExecutionContext`에서 `[name].start.after`(시크 키) 복원 → 없으면 빈 맵으로 초기화 → `super.open()` 호출 |
+| **`super.open()`** | `AbstractItemCountingItemStreamItemReader` | 위 `open()` 내부에서 | `doOpen()` 호출 → `[name].read.count`(몇 번째까지 읽었는지) 복원 → 0보다 크면 `jumpToItem(itemCount)` 호출 |
+| **`doOpen()`** | `AbstractPagingItemReader` | `super.open()` 내부, **1번** | "이미 열려있는 리더를 또 열면 안 된다"는 상태 체크만 함(`initialized=true`). JDBC 커넥션 등 실제 리소스는 여기서 안 엶 — 매 페이지 쿼리마다 `JdbcTemplate`이 알아서 커넥션을 얻고 반환하기 때문 |
+| **`jumpToItem(itemIndex)`** | `AbstractPagingItemReader` (오버라이드) | 재시작이고 `read.count > 0`일 때만, `super.open()` 안에서 **1번** | `page = itemIndex/pageSize`, `current = itemIndex%pageSize` 계산만 함(쿼리 재실행 없이 O(1)) — 다음 `doRead()` 호출 때 이 `page`/`current` 값 기준으로 `doReadPage()`가 시크 쿼리를 날림 |
+| **`read()`** | `AbstractItemCountingItemStreamItemReader` | `ChunkOrientedStep.readItem()`이 청크 하나 채울 때까지 **아이템마다 1번씩** 반복 호출 | `currentItemCount` 증가 → `doRead()` 위임 → 결과가 `ItemCountAware`면 개수 세팅 |
+| **`doRead()`** | `AbstractPagingItemReader` | `read()`가 **매번** 위임 | `results`가 없거나 현재 페이지를 다 썼으면(`current >= pageSize`) `doReadPage()`로 새 페이지 조회 → 메모리의 `results`에서 `current` 인덱스의 행 하나 반환 (없으면 `null` = 더 이상 읽을 게 없음, 청크 종료 신호) |
+| **`doReadPage()`** | `JdbcPagingItemReader` (구현) | `doRead()`가 **페이지 경계에서만** 호출 (즉 매 `pageSize`개 아이템마다 1번, 매 아이템마다가 아님) | `getPage()==0`이면 `firstPageSql` 실행, 아니면 `startAfterValues`를 파라미터로 `remainingPagesSql`(시크 쿼리) 실행 → 결과를 `results`에 채움 |
+| **`PagingRowMapper.mapRow()`** | `JdbcPagingItemReader` (내부 클래스) | `doReadPage()`가 `JdbcTemplate.query(...)`를 호출하는 동안, **ResultSet의 행마다 1번씩** | 두 가지 일을 동시에 함: ① 그 행의 정렬 키 값으로 `startAfterValues` 갱신(다음 페이지 시크용) ② 사용자가 준 `rowMapper`에 실제 매핑 위임 |
+| **`getParameterMap()` / `getParameterList()`** | `JdbcPagingItemReader` | `doReadPage()`가 remaining pages 쿼리 실행 직전 | 사용자 `parameterValues`(예: `status`)와 시크 키 값(`_id` 등 언더스코어 접두사)을 하나의 파라미터 맵/리스트로 합침 |
+| **`update(ExecutionContext)`** | `JdbcPagingItemReader` (오버라이드) | `ChunkOrientedStep.doExecute()`가 **청크 트랜잭션 커밋 직전마다** 호출 (`compositeItemStream.update(...)`) | `isAtEndOfPage()`면 `startAfterValues`(방금 다 읽은 페이지의 마지막 키)를, 아니면 `previousStartAfterValues`(현재 페이지 시작점)를 `[name].start.after`에 저장 |
+| **`isAtEndOfPage()`** | `JdbcPagingItemReader` (private) | `update()` 내부에서만 | `currentItemCount % pageSize == 0`인지 체크 — 청크 커밋 지점이 페이지 경계와 정확히 맞아떨어지는지 판단 |
+| **`close()`** | `AbstractItemCountingItemStreamItemReader` | `ChunkOrientedStep.close()` → Step 종료 시(성공/실패 무관) **1번** | `currentItemCount=0` 리셋 → `doClose()` 호출 |
+| **`doClose()`** | `AbstractPagingItemReader` | `close()` 내부에서 **1번** | `initialized=false`, `current=0`, `page=0`, `results=null`로 전부 초기화 — 보통 `@StepScope`라 매 Step 실행마다 새 인스턴스가 만들어지긴 하지만 방어적으로 리셋 |
+
+### 핵심만 한 줄로
+
+- **`afterPropertiesSet` / `open` / `close`**: Step 하나당 각각 딱 1번 — 준비/시작/종료.
+- **`read` / `doRead`**: 아이템 하나 꺼낼 때마다(청크 채우는 동안 반복) — 메모리 캐시에서 꺼내거나, 다 썼으면 새 페이지를 가져오라고 요청.
+- **`doReadPage`**: `pageSize`개 아이템마다 1번 — 실제 DB 왕복이 일어나는 유일한 지점.
+- **`update`**: 청크 커밋마다 1번 — 재시작용 상태(정확히는 "몇 개 읽었는지" + "어디서부터 다시 시작할지")를 영속화.
+
+## 3. `doRead()` — 페이지를 언제 새로 가져오는가
 
 ```java
 // AbstractPagingItemReader
@@ -37,7 +86,7 @@ protected T doRead() throws Exception {
 `doReadPage()`로 다음 페이지를 새로 조회합니다. 즉 **DB 왕복은 페이지 경계에서만** 일어나고,
 그 사이 `read()` 호출은 메모리에서 처리됩니다.
 
-## 3. `doReadPage()` — 실제 SQL 실행 (핵심)
+## 4. `doReadPage()` — 실제 SQL 실행 (핵심)
 
 ```java
 // JdbcPagingItemReader
@@ -84,7 +133,7 @@ FETCH NEXT 10 ROWS ONLY
 > "On restart, it uses the last sort key value to locate the first page to read (so it doesn't
 > matter if the successfully processed items have been removed or modified)."
 
-## 4. `startAfterValues`는 어디서 갱신되는가 — `PagingRowMapper`의 이중 역할
+## 5. `startAfterValues`는 어디서 갱신되는가 — `PagingRowMapper`의 이중 역할
 
 ```java
 private class PagingRowMapper implements RowMapper<T> {
@@ -102,7 +151,7 @@ private class PagingRowMapper implements RowMapper<T> {
 덮어씁니다. 그래서 페이지 조회가 끝나는 시점엔 자연스럽게 **"이 페이지 마지막 행의 키"**가
 남아 있게 됩니다. 이게 다음 페이지 조회에 쓰이는 시크 키입니다.
 
-## 5. 재시작(restart) — 두 가지 상태가 함께 동작
+## 6. 재시작(restart) — 두 가지 상태가 함께 동작
 
 `ExecutionContext`엔 두 종류의 키가 저장됩니다.
 
@@ -151,7 +200,7 @@ public void update(ExecutionContext executionContext) {
 굳이 중간 지점의 정확한 키를 저장하지 않고 "페이지 시작 + 인덱스 스킵" 조합으로 처리하는 게,
 중간 행의 키를 별도로 추적하는 것보다 단순하고 안전하기 때문으로 보입니다.
 
-## 6. 초기화 시점(`afterPropertiesSet`)에 이미 SQL이 확정됨
+## 7. 초기화 시점(`afterPropertiesSet`)에 이미 SQL이 확정됨
 
 ```java
 public void afterPropertiesSet() throws Exception {
@@ -166,7 +215,7 @@ public void afterPropertiesSet() throws Exception {
 두 SQL 문자열은 **빈 초기화 시점에 딱 한 번만 만들어지고 재사용**됩니다. 매 페이지 조회마다
 SQL을 다시 조립하지 않습니다.
 
-## 7. DB별 SQL은 어떻게 정해지는가 — 자동 감지
+## 8. DB별 SQL은 어떻게 정해지는가 — 자동 감지
 
 이 프로젝트의 ex16/ex17처럼 `.queryProvider(...)`를 직접 안 주고 `selectClause`/`fromClause`/
 `sortKeys`만 준 경우:
@@ -182,7 +231,7 @@ H2를 쓰는 이 프로젝트는 `H2PagingQueryProvider`가 선택되고, 이건
 DB별로 따로 존재합니다(`MySqlPagingQueryProvider`, `OraclePagingQueryProvider`,
 `SqlServerPagingQueryProvider`, `PostgresPagingQueryProvider` 등).
 
-## 8. `JpaPagingItemReader`(ex18)와의 결정적 차이
+## 9. `JpaPagingItemReader`(ex18)와의 결정적 차이
 
 ex18의 `JpaPagingItemReader`를 돌렸을 때 찍힌 실제 Hibernate SQL:
 
@@ -205,7 +254,7 @@ ex18의 `JpaPagingItemReader`를 돌렸을 때 찍힌 실제 Hibernate SQL:
 "페이징 리더는 OFFSET이라 위험하다"는 일반론을 그대로 `JdbcPagingItemReader`에 적용하면
 안 됩니다.
 
-## 9. 실무에서 알아야 할 함정
+## 10. 실무에서 알아야 할 함정
 
 1. **`sortKeys`는 반드시 유니크해야 함**: 시크 페이징이 정확하려면 정렬 키로 각 행을
    유일하게 식별할 수 있어야 합니다. 유니크하지 않은 컬럼을 sortKey로 쓰면, 같은 키 값을
