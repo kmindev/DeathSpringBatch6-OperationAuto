@@ -27,22 +27,22 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 @RequiredArgsConstructor
 @Configuration
-public class SystemFailureJobConfiguration {
+public class JsonSystemFailureJobConfiguration {
     private final JobRepository jobRepository;
     private final ObjectMapper objectMapper;
 
     @Bean
-    public Job systemFailureJob(Step systemFailureStep) {
+    public Job jsonSystemFailureJob(Step jsonSystemFailureStep) {
         return new JobBuilder(jobRepository)
-            .start(systemFailureStep)
+            .start(jsonSystemFailureStep)
             .build();
     }
 
     @Bean
-    public Step systemFailureStep(JsonItemReader<SystemFailure> systemFailureFlatFileItemReader) {
+    public Step jsonSystemFailureStep(JsonItemReader<SystemFailure> jsonSystemFailureItemReader) {
         return new StepBuilder(jobRepository)
             .<SystemFailure, SystemFailure>chunk(10)
-            .reader(systemFailureFlatFileItemReader)
+            .reader(jsonSystemFailureItemReader)
             .writer(items -> items.forEach(item -> log.info("{}", item)))
             .build();
     }
@@ -73,7 +73,7 @@ public class SystemFailureJobConfiguration {
 
     @Bean
     @StepScope
-    public JsonItemReader<SystemFailure> systemFailureFlatFileItemReader(@Value("#{jobParameters['inputFile']}") String inputFile) {
+    public JsonItemReader<SystemFailure> jsonSystemFailureItemReader(@Value("#{jobParameters['inputFile']}") String inputFile) {
         return new JsonItemReaderBuilder<SystemFailure>()
             .jsonObjectReader(new JacksonJsonObjectReader<>(SystemFailure.class))
             .name("systemFailureStep")
@@ -83,7 +83,7 @@ public class SystemFailureJobConfiguration {
 
     @Bean
     @StepScope
-    public JsonFileItemWriter<DeathNote> systemFailureFlatFileItemWriter(@Value("#{jobParameters['outputPath']}") String outputPath) {
+    public JsonFileItemWriter<DeathNote> jsonSystemFailureItemWriter(@Value("#{jobParameters['outputPath']}") String outputPath) {
         return new JsonFileItemWriterBuilder<DeathNote>()
             .jsonObjectMarshaller(new JacksonJsonObjectMarshaller<>())
             .resource(new FileSystemResource(outputPath + "/death_notes.json"))
