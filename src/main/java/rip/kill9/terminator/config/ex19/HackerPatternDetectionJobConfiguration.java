@@ -18,7 +18,9 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.data.MongoCursorItemReader;
+import org.springframework.batch.infrastructure.item.data.MongoPagingItemReader;
 import org.springframework.batch.infrastructure.item.data.builder.MongoCursorItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.data.builder.MongoPagingItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,7 +49,7 @@ public class HackerPatternDetectionJobConfiguration {
 
     @Bean
     public Step hackerPatternDetectionStep(
-        MongoCursorItemReader<SecurityLog> securityLogReader,
+        MongoPagingItemReader<SecurityLog> securityLogReader,
         ItemProcessor<SecurityLog, SecurityLog> hackerPatternAnalyzeProcessor
     ) {
         return new StepBuilder(jobRepository)
@@ -61,9 +63,65 @@ public class HackerPatternDetectionJobConfiguration {
             .build();
     }
 
+    // 1. MongoCursorItemReader + jsonQuery 방식
+//    @Bean
+//    @StepScope
+//    public MongoCursorItemReader<SecurityLog> securityLogReader(
+//        @Value("#{jobParameters['searchDate']}") LocalDate searchDate
+//    ) {
+//        Date startOfDay = Date.from(searchDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+//        Date endOfDay = Date.from(
+//            searchDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+//
+//        return new MongoCursorItemReaderBuilder<SecurityLog>()
+//            .name("securityLogReader")
+//            .template(mongoTemplate)
+//            .collection("security_logs")
+//            .jsonQuery("""
+//                    {
+//                        "label": "PENDING_ANALYSIS",
+//                        "timestamp": {
+//                            "$gte": ?0,
+//                            "$lt": ?1
+//                        }
+//                    }
+//                    """)
+//            .parameterValues(List.of(startOfDay, endOfDay))
+//            .sorts(Map.of("timestamp", Sort.Direction.ASC))
+//            .targetType(SecurityLog.class)
+//            .batchSize(10)
+//            .build();
+//    }
+
+    // 2. MongoCursorItemReader + Query/Criteria 방식
+//    @Bean
+//    @StepScope
+//    public MongoCursorItemReader<SecurityLog> securityLogReader(
+//        @Value("#{jobParameters['searchDate']}") LocalDate searchDate
+//    ) {
+//        Query query = new Query()
+//            .addCriteria(Criteria.where("label").is("PENDING_ANALYSIS"))
+//            .addCriteria(Criteria.where("timestamp")
+//                .gte(Date.from(searchDate.atStartOfDay(ZoneId.systemDefault()).toInstant()))
+//                .lt(Date.from(searchDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant())))
+//            .with(Sort.by(Direction.ASC, "timestamp"))
+//            .cursorBatchSize(10);
+//
+//        return new MongoCursorItemReaderBuilder<SecurityLog>()
+//            .name("securityLogReader")
+//            .template(mongoTemplate)
+//            .collection("security_logs")
+//            .query(query)
+//            .sorts(Map.of("timestamp", Direction.ASC)) // 빌더 버그 때문에 필요함
+//            .targetType(SecurityLog.class)
+//            .batchSize(10)
+//            .build();
+//    }
+
+    // 3. MongoPagingItemReader + Query/Criteria 방식 (최종)
     @Bean
     @StepScope
-    public MongoCursorItemReader<SecurityLog> securityLogReader(
+    public MongoPagingItemReader<SecurityLog> securityLogReader(
         @Value("#{jobParameters['searchDate']}") LocalDate searchDate
     ) {
         Query query = new Query()
@@ -71,17 +129,16 @@ public class HackerPatternDetectionJobConfiguration {
             .addCriteria(Criteria.where("timestamp")
                 .gte(Date.from(searchDate.atStartOfDay(ZoneId.systemDefault()).toInstant()))
                 .lt(Date.from(searchDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant())))
-            .with(Sort.by(Direction.ASC, "timestamp"))
-            .cursorBatchSize(10);
+            .with(Sort.by(Direction.ASC, "timestamp"));
 
-        return new MongoCursorItemReaderBuilder<SecurityLog>()
+        return new MongoPagingItemReaderBuilder<SecurityLog>()
             .name("securityLogReader")
             .template(mongoTemplate)
             .collection("security_logs")
             .query(query)
             .sorts(Map.of("timestamp", Direction.ASC)) // 빌더 버그 때문에 필요함
             .targetType(SecurityLog.class)
-            .batchSize(10)
+            .pageSize(10)
             .build();
     }
 
