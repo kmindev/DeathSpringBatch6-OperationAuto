@@ -12,6 +12,10 @@ spring:
     console:
       enabled: true
 
+  data:
+    mongodb:
+      uri: mongodb://root:root@localhost:27017/death-spring-batch?authSource=admin
+
   jpa:
     hibernate:
       ddl-auto: none
