@@ -15,6 +15,11 @@ spring:
   mongodb:
     uri: mongodb://root:root@localhost:27018/death-spring-batch?replicaSet=rs0&authSource=admin
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   jpa:
     hibernate:
       ddl-auto: none

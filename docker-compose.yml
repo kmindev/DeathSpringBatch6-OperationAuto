@@ -59,6 +59,16 @@ services:
           rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27018" }] });
         }
 
+  redis:
+    image: redis:7
+    container_name: death-spring-batch-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
 volumes:
   mongo-data:
   mongo-keyfile-data:
+  redis-data:
