@@ -21,6 +21,19 @@ Spring Batch 스터디
 | ex16 | JdbcCursorItemReader / JdbcPagingItemReader 예제 (H2 `victims` 테이블에서 조건부 조회, 현재는 페이징 방식 활성화, `schema.sql`/`data.sql`로 샘플 데이터 자동 적재) | `./gradlew bootRun --args='--spring.batch.job.name=terminatedVictimRecordJob'` |
 | ex17 | JdbcPagingItemReader + ItemProcessor + JdbcBatchItemWriter 예제 (H2 `orders` 테이블에서 상태 불일치("탈취된") 주문을 찾아 상태 복구) | `./gradlew bootRun --args='--spring.batch.job.name=resecureJob'` |
 | ex18 | JpaCursorItemReader → JpaNamedQueryProvider → JpaPagingItemReader 순으로 발전시킨 예제 (H2 `posts`/`reports` 테이블, 기간 내 신고된 게시물 조회 후 신고 점수 계산해 `JpaItemWriter`로 `exterminated_posts` 테이블에 저장, 현재는 페이징 방식 활성화) | `./gradlew bootRun --args="--spring.batch.job.name=toxicPostExterminationJob startDateTime=2026-09-10T00:00:00,java.time.LocalDateTime endDateTime=2026-09-11T00:00:00,java.time.LocalDateTime"` |
+| ex19 | MongoItemReader/MongoItemWriter 예제 (`security_logs` 컬렉션에서 `PENDING_ANALYSIS` 상태의 보안 로그를 조회해 공격 패턴 분석 후 `MongoItemWriter`로 label upsert, `MongoTransactionManager` 사용, 현재는 MongoPagingItemReader + Query/Criteria 방식 활성화) | `./gradlew bootRun --args="--spring.batch.job.name=hackerPatternDetectionJob searchDate=2026-10-28,java.time.LocalDate"`<br>(MongoDB 실행 필요, 아래 참고) |
+
+## MongoDB 실행 (ex19)
+
+`MongoTransactionManager`를 쓰기 때문에 MongoDB가 단일 노드 replica set(`rs0`)으로 떠 있어야 합니다. 최초 1회 keyfile을 생성한 뒤 `docker compose up`으로 띄우면 됩니다.
+
+```
+openssl rand -base64 756 > mongo-keyfile
+chmod 400 mongo-keyfile
+docker compose up -d
+```
+
+`mongo-keyfile`은 `.gitignore`에 포함되어 있어 각자 로컬에서 생성해야 합니다. 접속 정보는 `application.yml`의 `spring.mongodb.uri`를 참고하세요 (root/root, `localhost:27018`).
 
 ## SQL 로그 확인
 

@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
+import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -36,11 +37,20 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Slf4j
 @Configuration
-@AllArgsConstructor
 public class HackerPatternDetectionJobConfiguration {
+
     private final JobRepository jobRepository;
-    private final PlatformTransactionManager transactionManager;
     private final MongoTemplate mongoTemplate;
+    private final PlatformTransactionManager mongoTransactionManager;
+
+    public HackerPatternDetectionJobConfiguration(
+        JobRepository jobRepository,
+        MongoTemplate mongoTemplate
+    ) {
+        this.jobRepository = jobRepository;
+        this.mongoTemplate=mongoTemplate;
+        this.mongoTransactionManager = new MongoTransactionManager(mongoTemplate.getMongoDatabaseFactory());
+    }
 
     @Bean
     public Job hackerPatternDetectionJob(Step hackerPatternDetectionStep) {
@@ -58,7 +68,7 @@ public class HackerPatternDetectionJobConfiguration {
     ) {
         return new StepBuilder(jobRepository)
             .<SecurityLog, SecurityLog>chunk(10)
-            .transactionManager(transactionManager)
+            .transactionManager(mongoTransactionManager)
             .reader(securityLogReader)
             .processor(hackerPatternAnalyzeProcessor)
             .writer(securityLogWriter)

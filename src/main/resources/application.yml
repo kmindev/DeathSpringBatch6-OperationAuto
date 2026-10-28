@@ -13,7 +13,7 @@ spring:
       enabled: true
 
   mongodb:
-    uri: mongodb://root:root@localhost:27018/death-spring-batch?authSource=admin
+    uri: mongodb://root:root@localhost:27018/death-spring-batch?replicaSet=rs0&authSource=admin
 
   jpa:
     hibernate:

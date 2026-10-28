@@ -1,16 +1,64 @@
 services:
+  # mongo-keyfile을 named volume으로 복사하면서 mongodb 유저(999) 소유로 맞춤
+  # (macOS의 bind mount는 호스트 파일 소유권을 바꿀 수 없어서 named volume을 거쳐감)
+  mongodb-keyfile-init:
+    image: mongo:7
+    volumes:
+      - ./mongo-keyfile:/src/mongo-keyfile:ro
+      - mongo-keyfile-data:/dst
+    entrypoint:
+      - bash
+      - -c
+      - "cp /src/mongo-keyfile /dst/mongo-keyfile && chown 999:999 /dst/mongo-keyfile && chmod 400 /dst/mongo-keyfile"
+
   mongodb:
     image: mongo:7
     container_name: death-spring-batch-mongo
     restart: unless-stopped
+    depends_on:
+      mongodb-keyfile-init:
+        condition: service_completed_successfully
+    command: ["--replSet", "rs0", "--keyFile", "/etc/mongo-keyfile-dir/mongo-keyfile", "--port", "27018"]
     ports:
-      - "27018:27017"
+      - "27018:27018"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
       MONGO_INITDB_DATABASE: death-spring-batch
     volumes:
       - mongo-data:/data/db
+      - mongo-keyfile-data:/etc/mongo-keyfile-dir:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping:1}).ok' localhost:27018/test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # mongodb를 단일 노드 replica set(rs0)으로 초기화 (MongoTransactionManager 사용을 위해 필요)
+  mongodb-init:
+    image: mongo:7
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - mongosh
+      - --host
+      - mongodb:27018
+      - -u
+      - root
+      - -p
+      - root
+      - --authenticationDatabase
+      - admin
+      - --eval
+      - |
+        try {
+          rs.status();
+        } catch (e) {
+          rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27018" }] });
+        }
 
 volumes:
   mongo-data:
+  mongo-keyfile-data:
