@@ -18,8 +18,10 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.data.MongoCursorItemReader;
+import org.springframework.batch.infrastructure.item.data.MongoItemWriter;
 import org.springframework.batch.infrastructure.item.data.MongoPagingItemReader;
 import org.springframework.batch.infrastructure.item.data.builder.MongoCursorItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.data.builder.MongoItemWriterBuilder;
 import org.springframework.batch.infrastructure.item.data.builder.MongoPagingItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -50,16 +52,16 @@ public class HackerPatternDetectionJobConfiguration {
     @Bean
     public Step hackerPatternDetectionStep(
         MongoPagingItemReader<SecurityLog> securityLogReader,
-        ItemProcessor<SecurityLog, SecurityLog> hackerPatternAnalyzeProcessor
+        ItemProcessor<SecurityLog, SecurityLog> hackerPatternAnalyzeProcessor,
+        // MongoItemWriter 추가
+        MongoItemWriter<SecurityLog> securityLogWriter
     ) {
         return new StepBuilder(jobRepository)
             .<SecurityLog, SecurityLog>chunk(10)
             .transactionManager(transactionManager)
             .reader(securityLogReader)
             .processor(hackerPatternAnalyzeProcessor)
-            .writer(items -> items.forEach(securityLog ->
-                log.info("[패턴 탐지] {}: {}", securityLog.getLabel(), securityLog)
-            ))
+            .writer(securityLogWriter)
             .build();
     }
 
@@ -170,6 +172,15 @@ public class HackerPatternDetectionJobConfiguration {
         }
 
         return "UNKNOWN";
+    }
+
+    @Bean
+    public MongoItemWriter<SecurityLog> securityLogWriter() {
+        return new MongoItemWriterBuilder<SecurityLog>()
+            .template(mongoTemplate)
+            .collection("security_logs")
+            .mode(MongoItemWriter.Mode.UPSERT)  // 기존 문서 수정
+            .build();
     }
 
     @Document
