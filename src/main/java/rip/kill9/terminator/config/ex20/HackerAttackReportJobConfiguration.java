@@ -13,6 +13,7 @@ import org.springframework.batch.infrastructure.item.redis.RedisItemReader;
 import org.springframework.batch.infrastructure.item.redis.RedisItemWriter;
 import org.springframework.batch.infrastructure.item.redis.builder.RedisItemReaderBuilder;
 import org.springframework.batch.infrastructure.item.redis.builder.RedisItemWriterBuilder;
+import org.springframework.batch.infrastructure.item.support.builder.CompositeItemWriterBuilder;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,18 +60,18 @@ public class HackerAttackReportJobConfiguration {
     @Bean
     public Step aggregateHackerAttackStep(
         RedisItemReader<String, AttackLog> attackLogReader,
-        AttackCounter attackCounter,
+        AggregateHackerAttackItemWriter aggregateHackerAttackItemWriter,
         RedisItemWriter<String, AttackLog> deleteAttackLogWriter
     ) {
         return new StepBuilder(jobRepository)
             .<AttackLog, AttackLog>chunk(10)
             .reader(attackLogReader)
-            .processor(attackLog -> {
-                log.info("{}", attackLog);
-                attackCounter.record(attackLog);
-                return attackLog;
-            })
-            .writer(deleteAttackLogWriter)
+            .writer(new CompositeItemWriterBuilder<AttackLog>()
+                .delegates(
+                    aggregateHackerAttackItemWriter,
+                    deleteAttackLogWriter
+                )
+                .build())
             .build();
     }
 
@@ -104,17 +105,17 @@ public class HackerAttackReportJobConfiguration {
             .build();
     }
 
-//    @Component
-//    @RequiredArgsConstructor
-//    public static class AggregateHackerAttackItemWriter implements ItemWriter<AttackLog> {
-//        private final AttackCounter attackCounter;
-//
-//        @Override
-//        public void write(Chunk<? extends AttackLog> chunk) {
-//            for (AttackLog attackLog : chunk) {
-//                log.info("{}", attackLog);
-//                attackCounter.record(attackLog);
-//            }
-//        }
-//    }
+    @Component
+    @RequiredArgsConstructor
+    public static class AggregateHackerAttackItemWriter implements ItemWriter<AttackLog> {
+        private final AttackCounter attackCounter;
+
+        @Override
+        public void write(Chunk<? extends AttackLog> chunk) {
+            for (AttackLog attackLog : chunk) {
+                log.info("{}", attackLog);
+                attackCounter.record(attackLog);
+            }
+        }
+    }
 }
