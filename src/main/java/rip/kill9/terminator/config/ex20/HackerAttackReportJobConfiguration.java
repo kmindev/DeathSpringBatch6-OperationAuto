@@ -10,7 +10,9 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.redis.RedisItemReader;
+import org.springframework.batch.infrastructure.item.redis.RedisItemWriter;
 import org.springframework.batch.infrastructure.item.redis.builder.RedisItemReaderBuilder;
+import org.springframework.batch.infrastructure.item.redis.builder.RedisItemWriterBuilder;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -57,12 +59,18 @@ public class HackerAttackReportJobConfiguration {
     @Bean
     public Step aggregateHackerAttackStep(
         RedisItemReader<String, AttackLog> attackLogReader,
-        AggregateHackerAttackItemWriter aggregateHackerAttackItemWriter
+        AttackCounter attackCounter,
+        RedisItemWriter<String, AttackLog> deleteAttackLogWriter
     ) {
         return new StepBuilder(jobRepository)
             .<AttackLog, AttackLog>chunk(10)
             .reader(attackLogReader)
-            .writer(aggregateHackerAttackItemWriter)
+            .processor(attackLog -> {
+                log.info("{}", attackLog);
+                attackCounter.record(attackLog);
+                return attackLog;
+            })
+            .writer(deleteAttackLogWriter)
             .build();
     }
 
@@ -87,17 +95,26 @@ public class HackerAttackReportJobConfiguration {
             .build();
     }
 
-    @Component
-    @RequiredArgsConstructor
-    public static class AggregateHackerAttackItemWriter implements ItemWriter<AttackLog> {
-        private final AttackCounter attackCounter;
-
-        @Override
-        public void write(Chunk<? extends AttackLog> chunk) {
-            for (AttackLog attackLog : chunk) {
-                log.info("{}", attackLog);
-                attackCounter.record(attackLog);
-            }
-        }
+    @Bean
+    public RedisItemWriter<String, AttackLog> deleteAttackLogWriter() {
+        return new RedisItemWriterBuilder<String, AttackLog>()
+            .redisTemplate(redisTemplate)
+            .itemKeyMapper(attackLog -> "attack:" + attackLog.getId()) // 키 구성
+            .delete(true) // DEL 명령사용하여 삭제, false일 경우 저장
+            .build();
     }
+
+//    @Component
+//    @RequiredArgsConstructor
+//    public static class AggregateHackerAttackItemWriter implements ItemWriter<AttackLog> {
+//        private final AttackCounter attackCounter;
+//
+//        @Override
+//        public void write(Chunk<? extends AttackLog> chunk) {
+//            for (AttackLog attackLog : chunk) {
+//                log.info("{}", attackLog);
+//                attackCounter.record(attackLog);
+//            }
+//        }
+//    }
 }
