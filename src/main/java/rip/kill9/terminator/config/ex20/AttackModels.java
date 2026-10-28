@@ -18,6 +18,23 @@ public class AttackModels {
         private String targetIp;
         private AttackType attackType;
         private String payload;
+        private SeverityLevel severityLevel;  // 추가
+    }
+
+    enum SeverityLevel {
+        CRITICAL, // 치명적 공격 (즉시 대응 필요)
+        NORMAL;   // 일반 공격 (로그 기록)
+
+        @JsonCreator
+        public static SeverityLevel fromString(String value) {
+            if (value == null) return NORMAL;
+
+            return switch (value.toUpperCase()) {
+                case "CRITICAL" -> CRITICAL;
+                case "NORMAL" -> NORMAL;
+                default -> NORMAL;
+            };
+        }
     }
 
     public enum AttackType {

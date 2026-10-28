@@ -13,8 +13,10 @@ import org.springframework.batch.infrastructure.item.redis.RedisItemReader;
 import org.springframework.batch.infrastructure.item.redis.RedisItemWriter;
 import org.springframework.batch.infrastructure.item.redis.builder.RedisItemReaderBuilder;
 import org.springframework.batch.infrastructure.item.redis.builder.RedisItemWriterBuilder;
+import org.springframework.batch.infrastructure.item.support.ClassifierCompositeItemWriter;
 import org.springframework.batch.infrastructure.item.support.builder.CompositeItemWriterBuilder;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
+import org.springframework.classify.Classifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -57,23 +59,23 @@ public class HackerAttackReportJobConfiguration {
             .build();
     }
 
-    @Bean
-    public Step aggregateHackerAttackStep(
-        RedisItemReader<String, AttackLog> attackLogReader,
-        AggregateHackerAttackItemWriter aggregateHackerAttackItemWriter,
-        RedisItemWriter<String, AttackLog> deleteAttackLogWriter
-    ) {
-        return new StepBuilder(jobRepository)
-            .<AttackLog, AttackLog>chunk(10)
-            .reader(attackLogReader)
-            .writer(new CompositeItemWriterBuilder<AttackLog>()
-                .delegates(
-                    aggregateHackerAttackItemWriter,
-                    deleteAttackLogWriter
-                )
-                .build())
-            .build();
-    }
+//    @Bean
+//    public Step aggregateHackerAttackStep(
+//        RedisItemReader<String, AttackLog> attackLogReader,
+//        AggregateHackerAttackItemWriter aggregateHackerAttackItemWriter,
+//        RedisItemWriter<String, AttackLog> deleteAttackLogWriter
+//    ) {
+//        return new StepBuilder(jobRepository)
+//            .<AttackLog, AttackLog>chunk(10)
+//            .reader(attackLogReader)
+//            .writer(new CompositeItemWriterBuilder<AttackLog>()
+//                .delegates(
+//                    aggregateHackerAttackItemWriter,
+//                    deleteAttackLogWriter
+//                )
+//                .build())
+//            .build();
+//    }
 
     @Bean
     public Step reportHackerAttacktStep(AttackCounter attackCounter) {
@@ -95,7 +97,7 @@ public class HackerAttackReportJobConfiguration {
                 .build())
             .build();
     }
-
+//
     @Bean
     public RedisItemWriter<String, AttackLog> deleteAttackLogWriter() {
         return new RedisItemWriterBuilder<String, AttackLog>()
@@ -103,6 +105,56 @@ public class HackerAttackReportJobConfiguration {
             .itemKeyMapper(attackLog -> "attack:" + attackLog.getId()) // 키 구성
             .delete(true) // DEL 명령사용하여 삭제, false일 경우 저장
             .build();
+    }
+//
+//    @Component
+//    @RequiredArgsConstructor
+//    public static class AggregateHackerAttackItemWriter implements ItemWriter<AttackLog> {
+//        private final AttackCounter attackCounter;
+//
+//        @Override
+//        public void write(Chunk<? extends AttackLog> chunk) {
+//            for (AttackLog attackLog : chunk) {
+//                log.info("{}", attackLog);
+//                attackCounter.record(attackLog);
+//            }
+//        }
+//    }
+
+    @Bean
+    public Step aggregateHackerAttackStep(
+        RedisItemReader<String, AttackLog> attackLogReader,
+        ClassifierCompositeItemWriter<AttackLog> attackLogClassifierWriter
+    ) {
+        return new StepBuilder(jobRepository)
+            .<AttackLog, AttackLog>chunk(10)
+            .reader(attackLogReader)
+            .writer(attackLogClassifierWriter)
+            .build();
+    }
+
+    @Bean
+    public ClassifierCompositeItemWriter<AttackLog> attackLogClassifierWriter(
+        AggregateHackerAttackItemWriter criticalAttackWriter,
+        NormalAttackLogWriter normalAttackWriter
+    ) {
+        ClassifierCompositeItemWriter<AttackLog> writer = new ClassifierCompositeItemWriter<>();
+        writer.setClassifier(new AttackSeverityClassifier(criticalAttackWriter, normalAttackWriter));
+        return writer;
+    }
+
+    @RequiredArgsConstructor
+    public static class AttackSeverityClassifier implements Classifier<AttackLog, ItemWriter<? super AttackLog>> {
+        private final ItemWriter<AttackLog> criticalWriter;
+        private final ItemWriter<AttackLog> normalWriter;
+
+        @Override
+        public ItemWriter<AttackLog> classify(AttackLog attackLog) {
+            if (attackLog.getSeverityLevel() == AttackModels.SeverityLevel.CRITICAL) {
+                return criticalWriter;
+            }
+            return normalWriter;
+        }
     }
 
     @Component
@@ -112,9 +164,21 @@ public class HackerAttackReportJobConfiguration {
 
         @Override
         public void write(Chunk<? extends AttackLog> chunk) {
+            log.info("치명적 공격 로그 처리 중...");
             for (AttackLog attackLog : chunk) {
-                log.info("{}", attackLog);
+                log.info("CRITICAL 공격: {}", attackLog);
                 attackCounter.record(attackLog);
+            }
+        }
+    }
+
+    @Component
+    public static class NormalAttackLogWriter implements ItemWriter<AttackLog> {
+        @Override
+        public void write(Chunk<? extends AttackLog> chunk) {
+            log.info("일반 공격 로그 처형 중...");
+            for (AttackLog attackLog : chunk) {
+                log.info("NORMAL 공격: {}", attackLog);
             }
         }
     }
